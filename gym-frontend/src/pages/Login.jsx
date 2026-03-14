@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { Link } from 'react-router-dom';
 import api from '../api/axios';
 
 export default function Login() {
@@ -52,6 +53,12 @@ export default function Login() {
                     >
                         Войти
                     </button>
+                    <p className="mt-6 text-center text-sm text-gray-600">
+                        Нет аккаунта?{' '}
+                        <Link to="/register" className="font-medium text-blue-600 hover:underline">
+                             Зарегистрироваться
+                        </Link>
+                    </p>
                 </form>
             </div>
         </div>
