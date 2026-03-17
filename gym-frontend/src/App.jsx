@@ -8,6 +8,7 @@ import AdminTrainers from './pages/admin/AdminTrainers';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import Profile from './pages/client/Profile';
 import AdminSchedule from './pages/admin/AdminSchedule';
+import AdminReports from './pages/admin/AdminReports';
 
 // Защищенный роут (только для авторизованных)
 const PrivateRoute = ({ children }) => {
@@ -47,6 +48,7 @@ function App() {
                             <Route path="/" element={<AdminDashboard />} />
                             <Route path="/trainers" element={<AdminTrainers />} />
                             <Route path="/schedule" element={<AdminSchedule />} />
+                            <Route path="/reports" element={<AdminReports />} />
                           </Routes>
                         </AdminRoute>
                     } />
