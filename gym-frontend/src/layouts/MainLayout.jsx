@@ -14,12 +14,18 @@ export default function MainLayout({ children }) {
             { name: 'Дашборд', path: '/admin' }, 
             { name: 'Расписание', path: '/admin/schedule' }, 
             { name: 'Тренеры', path: '/admin/trainers' }, 
-            { name: 'Отчеты', path: '/admin/reports' }
+            { name: 'Отчеты', path: '/admin/reports' },
+            { name: 'Клиенты', path: '/admin/users' },
+            { name: 'Абонементы', path: '/admin/memberships'},
+            { name: 'Услуги', path: '/admin/services' }, 
+            { name: 'Залы', path: '/admin/halls' },   
+            { name: 'Сообщения', path: '/admin/messages' }
         ]
         : [
             { name: 'Мой профиль', path: '/dashboard' }, 
             { name: 'Записаться', path: '/schedule' },
-            { name: 'Купить абонемент', path: '/buy-membership' } 
+            { name: 'Купить абонемент', path: '/buy-membership' },
+            { name: 'Обратная связь', path: '/support'}
          ];
     return (
         <div className="min-h-screen bg-gray-50">

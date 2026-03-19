@@ -26,6 +26,18 @@ exports.createService = async (req, res) => {
     }
 };
 
+exports.deleteService = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM Services WHERE ServiceID = @id');
+        res.json({ message: "Услуга удалена" });
+    } catch (err) {
+        res.status(500).json({ error: "Нельзя удалить услугу, которая используется в расписании" });
+    }
+};
+
 // --- ТИПЫ АБОНЕМЕНТОВ (MembershipTypes) ---
 exports.getMembershipTypes = async (req, res) => {
     try {
@@ -78,6 +90,18 @@ exports.createHall = async (req, res) => {
     }
 };
 
+exports.deleteHall = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM Halls WHERE HallID = @id');
+        res.json({ message: "Зал удален" });
+    } catch (err) {
+        res.status(500).json({ error: "Нельзя удалить зал, в котором назначены тренировки" });
+    }
+};
+
 // --- ПРОСТАЯ АНАЛИТИКА (Для админ-панели) ---
 // controllers/adminController.js
 
@@ -108,10 +132,13 @@ exports.getDashboardStats = async (req, res) => {
 
         // Дополнительно: Доходы по категориям (для графика)
         const revenueByType = await pool.request().query(`
-            SELECT mt.Name, SUM(p.Amount) as TotalRevenue
+            SELECT 
+                mt.Name, 
+                SUM(p.Amount) as TotalRevenue,
+                COUNT(p.PaymentID) as SalesCount
             FROM Payments p
-            JOIN ClientMemberships cm ON p.ClientID = cm.ClientID
-            JOIN MembershipTypes mt ON cm.TypeID = mt.TypeID
+            INNER JOIN ClientMemberships cm ON p.MembershipID = cm.MembershipID -- ГЛАВНОЕ ИСПРАВЛЕНИЕ ТУТ
+            INNER JOIN MembershipTypes mt ON cm.TypeID = mt.TypeID
             GROUP BY mt.Name
         `);
         stats.revenueData = revenueByType.recordset;
@@ -121,4 +148,103 @@ exports.getDashboardStats = async (req, res) => {
         console.error("Ошибка получения статистики:", err.message);
         res.status(500).json({ error: err.message });
     }
+};
+// Получить всех клиентов с информацией об их абонементах
+exports.getAllUsers = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT 
+                u.UserID, u.FullName, u.Email, u.Phone, u.CreatedAt,
+                mt.Name as MembershipName,
+                cm.EndDate, cm.RemainingVisits
+            FROM Users u
+            LEFT JOIN ClientMemberships cm ON u.UserID = cm.ClientID AND cm.EndDate >= GETDATE()
+            LEFT JOIN MembershipTypes mt ON cm.TypeID = mt.TypeID
+            WHERE u.RoleID = 2 -- Только клиенты
+            ORDER BY u.CreatedAt DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Удалить пользователя
+exports.deleteUser = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        // Сначала удаляем зависимости (в реальном проекте лучше использовать каскадное удаление в БД)
+        await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM Bookings WHERE ClientID = @id');
+        await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM Payments WHERE ClientID = @id');
+        await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM ClientMemberships WHERE ClientID = @id');
+        await pool.request().input('id', sql.Int, req.params.id).query('DELETE FROM Users WHERE UserID = @id');
+        res.json({ message: "Пользователь удален" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Контроль всех платежей
+exports.getAllPayments = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT p.*, u.FullName as ClientName 
+            FROM Payments p 
+            JOIN Users u ON p.ClientID = u.UserID 
+            ORDER BY p.PaymentDate DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Получение всех сообщений от пользователя
+exports.getMessages = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        const result = await pool.request().query(`
+            SELECT 
+                m.MessageID, 
+                m.MessageText, 
+                m.CreatedAt, 
+                m.Status,
+                u.FullName as ClientName, 
+                u.Email as ClientEmail, 
+                u.Phone as ClientPhone
+            FROM SupportMessages m
+            JOIN Users u ON m.ClientID = u.UserID
+            ORDER BY m.CreatedAt DESC
+        `);
+        res.json(result.recordset);
+    } catch (err) {
+        console.error("Ошибка при получении сообщений:", err.message);
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Удаление сообщений
+exports.deleteMessage = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM SupportMessages WHERE MessageID = @id');
+        res.json({ message: "Сообщение удалено" });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+// Удаление типа абонемента
+exports.deleteMembershipType = async (req, res) => {
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('id', sql.Int, req.params.id)
+            .query('DELETE FROM MembershipTypes WHERE TypeID = @id');
+        res.json({ message: "Тариф удален" });
+    } catch (err) { res.status(500).json({ error: "Нельзя удалить тариф, который уже куплен клиентами" }); }
 };

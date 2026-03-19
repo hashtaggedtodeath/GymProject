@@ -7,7 +7,8 @@ import {
     Calendar, 
     TrendingUp, 
     ChevronRight,
-    Activity
+    Activity,
+    MessageSquare
 } from 'lucide-react';
 
 export default function AdminDashboard() {
@@ -192,6 +193,18 @@ export default function AdminDashboard() {
                 </div>
                 <div className="bg-gray-50 p-3 rounded-xl text-gray-400 group-hover:bg-blue-50 group-hover:text-blue-600 transition-all">
                     <Activity size={24} />
+                </div>
+            </Link>
+            <Link 
+                to="/admin/messages" 
+                className="bg-white p-8 rounded-[2rem] border border-gray-100 flex justify-between items-center group hover:border-purple-200 transition-all hover:shadow-md hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                >
+                <div>
+                    <h3 className="text-xl font-bold text-gray-800">Обращения</h3>
+                    <p className="text-gray-400 mt-1 font-medium text-sm italic">Вопросы от клиентов зала</p>
+                </div>
+                <div className="bg-purple-50 p-3 rounded-xl text-purple-400 group-hover:bg-purple-100 group-hover:text-purple-600 transition-all">
+                    <MessageSquare size={24} />
                 </div>
             </Link>
 

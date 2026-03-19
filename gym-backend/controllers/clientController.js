@@ -3,42 +3,47 @@ const { sql, poolPromise } = require('../config/db');
 // Покупка абонемента
 exports.buyMembership = async (req, res) => {
     const { typeId } = req.body;
-    const clientId = req.user.id; // Берем ID из токена
+    const clientId = req.user.id;
 
     try {
         const pool = await poolPromise;
 
-        // 1. Получаем инфо о типе абонемента
         const typeRes = await pool.request()
             .input('id', sql.Int, typeId)
             .query('SELECT * FROM MembershipTypes WHERE TypeID = @id');
         
         const type = typeRes.recordset[0];
-        if (!type) return res.status(404).json({ message: "Тип абонемента не найден" });
+        if (!type) return res.status(404).json({ message: "Тариф не найден" });
 
-        // 2. Рассчитываем дату окончания
         const endDate = new Date();
         endDate.setDate(endDate.getDate() + type.DurationDays);
 
-        // 3. Создаем абонемент клиенту
-        await pool.request()
+        // 1. Создаем абонемент и ПОЛУЧАЕМ его ID (через OUTPUT inserted.MembershipID)
+        const membershipResult = await pool.request()
             .input('cId', sql.Int, clientId)
             .input('tId', sql.Int, typeId)
             .input('end', sql.DateTime, endDate)
             .input('limit', sql.Int, type.VisitsLimit)
             .query(`
                 INSERT INTO ClientMemberships (ClientID, TypeID, StartDate, EndDate, RemainingVisits)
+                OUTPUT inserted.MembershipID
                 VALUES (@cId, @tId, GETDATE(), @end, @limit)
             `);
 
-        // 4. Фиксируем платеж
+        const newMembershipId = membershipResult.recordset[0].MembershipID;
+
+        // 2. Создаем платеж, ПРИВЯЗАННЫЙ к этому абонементу
         await pool.request()
             .input('cId', sql.Int, clientId)
+            .input('mId', sql.Int, newMembershipId)
             .input('amount', sql.Decimal(10, 2), type.Price)
-            .input('desc', sql.NVarChar, `Покупка абонемента: ${type.Name}`)
-            .query('INSERT INTO Payments (ClientID, Amount, Description) VALUES (@cId, @amount, @desc)');
+            .input('desc', sql.NVarChar, `Покупка: ${type.Name}`)
+            .query(`
+                INSERT INTO Payments (ClientID, MembershipID, Amount, Description) 
+                VALUES (@cId, @mId, @amount, @desc)
+            `);
 
-        res.status(201).json({ message: "Абонемент успешно оформлен" });
+        res.status(201).json({ message: "Успешно куплено" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
@@ -185,6 +190,21 @@ exports.getClientHistory = async (req, res) => {
             .query('SELECT * FROM Payments WHERE ClientID = @cId ORDER BY PaymentDate DESC');
 
         res.json({ bookings: bookings.recordset, payments: payments.recordset });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};
+
+exports.sendSupportMessage = async (req, res) => {
+    const { message } = req.body;
+    const clientId = req.user.id;
+    try {
+        const pool = await poolPromise;
+        await pool.request()
+            .input('cId', sql.Int, clientId)
+            .input('txt', sql.NVarChar, message)
+            .query('INSERT INTO SupportMessages (ClientID, MessageText) VALUES (@cId, @txt)');
+        res.status(201).json({ message: "Сообщение отправлено" });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

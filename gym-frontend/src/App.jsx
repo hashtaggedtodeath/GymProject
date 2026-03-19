@@ -10,6 +10,12 @@ import Profile from './pages/client/Profile';
 import AdminSchedule from './pages/admin/AdminSchedule';
 import AdminReports from './pages/admin/AdminReports';
 import BuyMembership from './pages/client/BuyMembership';
+import AdminUsers from './pages/admin/AdminUsers';
+import Support from './pages/client/Support';
+import AdminMemberships from './pages/admin/AdminMemberships';
+import AdminMessages from './pages/admin/AdminMessages';
+import AdminServices from './pages/admin/AdminServices';
+import AdminHalls from './pages/admin/AdminHalls';
 
 // Защищенный роут (только для авторизованных)
 const PrivateRoute = ({ children }) => {
@@ -50,6 +56,11 @@ function App() {
                             <Route path="/trainers" element={<AdminTrainers />} />
                             <Route path="/schedule" element={<AdminSchedule />} />
                             <Route path="/reports" element={<AdminReports />} />
+                            <Route path="/users" element={<AdminUsers />} />
+                            <Route path="/memberships" element={<AdminMemberships />} />
+                            <Route path="/messages" element={<AdminMessages />} />
+                            <Route path="/services" element={<AdminServices />} />
+                            <Route path="/halls" element={<AdminHalls />} />
                           </Routes>
                         </AdminRoute>
                     } />
@@ -59,6 +70,7 @@ function App() {
                     <Route path="/login" element={<Login />} />
                     <Route path="/dashboard" element={<PrivateRoute><Profile /></PrivateRoute>} />
                     <Route path="/schedule" element={<PrivateRoute><Schedule /></PrivateRoute>} />
+                    <Route path="/support" element={<PrivateRoute><Support /></PrivateRoute>} />
                 </Routes>
             </AuthProvider>
         </BrowserRouter>
