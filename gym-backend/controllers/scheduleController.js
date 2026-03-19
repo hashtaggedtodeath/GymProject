@@ -2,21 +2,28 @@ const { sql, poolPromise } = require('../config/db');
 
 exports.getSchedule = async (req, res) => {
     try {
+        const clientId = req.user.id; // ID текущего пользователя из токена
         const pool = await poolPromise;
-        // Сложный запрос с JOIN, чтобы получить названия вместо ID
-        const result = await pool.request().query(`
-            SELECT 
-                s.ScheduleID, s.StartTime, s.EndTime, s.MaxClients,
-                t.FullName as TrainerName, 
-                h.Name as HallName, 
-                srv.Name as ServiceName
-            FROM Schedules s
-            JOIN Trainers t ON s.TrainerID = t.TrainerID
-            JOIN Halls h ON s.HallID = h.HallID
-            JOIN Services srv ON s.ServiceID = srv.ServiceID
-            WHERE s.StartTime >= GETDATE()
-            ORDER BY s.StartTime ASC
-        `);
+        
+        const result = await pool.request()
+            .input('cId', sql.Int, clientId)
+            .query(`
+                SELECT 
+                    s.ScheduleID, s.StartTime, s.EndTime, s.MaxClients,
+                    t.FullName as TrainerName, 
+                    h.Name as HallName, 
+                    srv.Name as ServiceName,
+                    -- Проверяем, записан ли текущий юзер
+                    (SELECT COUNT(*) FROM Bookings b WHERE b.ScheduleID = s.ScheduleID AND b.ClientID = @cId AND b.Status != 'Cancelled') as IsBooked,
+                    -- Считаем общее кол-во занятых мест
+                    (SELECT COUNT(*) FROM Bookings b WHERE b.ScheduleID = s.ScheduleID AND b.Status != 'Cancelled') as EnrolledCount
+                FROM Schedules s
+                JOIN Trainers t ON s.TrainerID = t.TrainerID
+                JOIN Halls h ON s.HallID = h.HallID
+                JOIN Services srv ON s.ServiceID = srv.ServiceID
+                WHERE s.StartTime >= GETDATE()
+                ORDER BY s.StartTime ASC
+            `);
         res.json(result.recordset);
     } catch (err) {
         res.status(500).json({ error: err.message });

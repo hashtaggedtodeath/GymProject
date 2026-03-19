@@ -79,25 +79,46 @@ exports.createHall = async (req, res) => {
 };
 
 // --- ПРОСТАЯ АНАЛИТИКА (Для админ-панели) ---
+// controllers/adminController.js
+
 exports.getDashboardStats = async (req, res) => {
     try {
         const pool = await poolPromise;
         const stats = {};
         
-        // Кол-во активных клиентов
-        const clients = await pool.request().query('SELECT COUNT(*) as count FROM Users WHERE RoleID = 2');
-        stats.totalClients = clients.recordset[0].count;
+        // 1. Считаем РЕАЛЬНОЕ кол-во уникальных клиентов с активными абонементами
+        const clients = await pool.request().query(`
+            SELECT COUNT(DISTINCT ClientID) as count 
+            FROM ClientMemberships 
+            WHERE EndDate >= GETDATE()
+        `);
+        stats.activeClients = clients.recordset[0].count;
 
-        // Общий доход
+        // 2. Считаем доход (уже работал, но освежим)
         const revenue = await pool.request().query('SELECT SUM(Amount) as total FROM Payments');
         stats.totalRevenue = revenue.recordset[0].total || 0;
 
-        // Кол-во предстоящих тренировок
-        const sessions = await pool.request().query('SELECT COUNT(*) as count FROM Schedules WHERE StartTime > GETDATE()');
-        stats.upcomingSessions = sessions.recordset[0].count;
+        // 3. Считаем тренировки именно на СЕГОДНЯ (от 00:00 до 23:59)
+        const sessions = await pool.request().query(`
+            SELECT COUNT(*) as count 
+            FROM Schedules 
+            WHERE CAST(StartTime AS DATE) = CAST(GETDATE() AS DATE)
+        `);
+        stats.todaySessions = sessions.recordset[0].count;
+
+        // Дополнительно: Доходы по категориям (для графика)
+        const revenueByType = await pool.request().query(`
+            SELECT mt.Name, SUM(p.Amount) as TotalRevenue
+            FROM Payments p
+            JOIN ClientMemberships cm ON p.ClientID = cm.ClientID
+            JOIN MembershipTypes mt ON cm.TypeID = mt.TypeID
+            GROUP BY mt.Name
+        `);
+        stats.revenueData = revenueByType.recordset;
 
         res.json(stats);
     } catch (err) {
+        console.error("Ошибка получения статистики:", err.message);
         res.status(500).json({ error: err.message });
     }
 };

@@ -77,14 +77,23 @@ exports.bookSession = async (req, res) => {
         if (schedule.BookedCount >= schedule.MaxClients) {
             return res.status(400).json({ message: "В группе нет свободных мест" });
         }
+        //3. Проверяем есть ли запись
+        const check = await pool.request()
+            .input('cId', sql.Int, clientId)
+            .input('sId', sql.Int, scheduleId)
+            .query("SELECT BookingID FROM Bookings WHERE ClientID = @cId AND ScheduleID = @sId AND Status = 'Confirmed'");
 
-        // 3. Создаем запись
+        if (check.recordset.length > 0) {
+            return res.status(400).json({ message: "Вы уже записаны" });
+        }
+
+        // 4. Создаем запись
         await pool.request()
             .input('cId', sql.Int, clientId)
             .input('sId', sql.Int, scheduleId)
-            .query('INSERT INTO Bookings (ClientID, ScheduleID) VALUES (@cId, @sId)');
+            .query("INSERT INTO Bookings (ClientID, ScheduleID, Status) VALUES (@cId, @sId, 'Confirmed')");
 
-        // 4. Списываем посещение (если не безлимит)
+        // 5. Списываем посещение (если не безлимит)
         if (membership.RemainingVisits !== null) {
             await pool.request()
                 .input('mId', sql.Int, membership.MembershipID)
@@ -93,7 +102,64 @@ exports.bookSession = async (req, res) => {
 
         res.status(201).json({ message: "Вы успешно записаны" });
     } catch (err) {
+        console.error("Ошибка при записи:", err.message);
         res.status(500).json({ error: err.message });
+    }
+};
+
+
+// Отмена записи
+exports.cancelBooking = async (req, res) => {
+    const { scheduleId } = req.body;
+    const clientId = req.user.id;
+
+    try {
+        const pool = await poolPromise;
+
+        // 1. Проверяем, существует ли активная запись
+        // Важно: используем одинарные кавычки для строк в SQL
+        const bookingRes = await pool.request()
+            .input('cId', sql.Int, clientId)
+            .input('sId', sql.Int, scheduleId)
+            .query("SELECT TOP 1 BookingID FROM Bookings WHERE ClientID = @cId AND ScheduleID = @sId AND Status = 'Confirmed'");
+
+        const booking = bookingRes.recordset[0];
+
+        if (!booking) {
+            console.log("Booking not found or already cancelled for scheduleId:", scheduleId);
+            return res.status(404).json({ message: "Запись не найдена или уже отменена" });
+        }
+
+        // 2. Начинаем транзакцию или последовательное обновление
+        // Сначала меняем статус записи
+        await pool.request()
+            .input('bId', sql.Int, booking.BookingID)
+            .query("UPDATE Bookings SET Status = 'Cancelled' WHERE BookingID = @bId");
+
+        // 3. Возвращаем занятие на самый свежий активный абонемент
+        // Мы ищем абонемент, который еще не истек и у которого есть лимит посещений
+        await pool.request()
+            .input('cId', sql.Int, clientId)
+            .query(`
+                UPDATE ClientMemberships 
+                SET RemainingVisits = RemainingVisits + 1 
+                WHERE MembershipID = (
+                    SELECT TOP 1 MembershipID 
+                    FROM ClientMemberships 
+                    WHERE ClientID = @cId 
+                    AND EndDate >= GETDATE() 
+                    AND RemainingVisits IS NOT NULL
+                    ORDER BY EndDate ASC
+                )
+            `);
+
+        console.log(`✅ Успешная отмена записи ${booking.BookingID} для клиента ${clientId}`);
+        res.json({ message: "Запись успешно отменена" });
+
+    } catch (err) {
+        // Выводим ошибку в терминал бэкенда, чтобы понять в чем дело
+        console.error("❌ Ошибка в cancelBooking:", err.message);
+        res.status(500).json({ error: "Ошибка сервера при отмене записи" });
     }
 };
 
@@ -102,19 +168,18 @@ exports.getClientHistory = async (req, res) => {
     const clientId = req.user.id;
     try {
         const pool = await poolPromise;
-        
         const bookings = await pool.request()
             .input('cId', sql.Int, clientId)
             .query(`
-                SELECT b.BookingDate, s.StartTime, srv.Name as ServiceName, t.FullName as TrainerName
+                SELECT b.BookingID, s.ScheduleID, s.StartTime, srv.Name as ServiceName, t.FullName as TrainerName
                 FROM Bookings b
                 JOIN Schedules s ON b.ScheduleID = s.ScheduleID
                 JOIN Services srv ON s.ServiceID = srv.ServiceID
                 JOIN Trainers t ON s.TrainerID = t.TrainerID
-                WHERE b.ClientID = @cId
-                ORDER BY b.BookingDate DESC
+                WHERE b.ClientID = @cId AND b.Status = 'Confirmed' -- ПОКАЗЫВАЕМ ТОЛЬКО ПОДТВЕРЖДЕННЫЕ
+                ORDER BY s.StartTime DESC
             `);
-
+        
         const payments = await pool.request()
             .input('cId', sql.Int, clientId)
             .query('SELECT * FROM Payments WHERE ClientID = @cId ORDER BY PaymentDate DESC');

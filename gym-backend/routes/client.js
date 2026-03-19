@@ -7,6 +7,7 @@ const auth = require('../middleware/auth');
 router.post('/buy-membership', auth(), clientCtrl.buyMembership);
 router.post('/book-session', auth(), clientCtrl.bookSession);
 router.get('/history', auth(), clientCtrl.getClientHistory);
+router.post('/cancel-booking', auth(), clientCtrl.cancelBooking);
 
 // Получение инфо о текущем абонементе
 router.get('/my-membership', auth(), async (req, res) => {

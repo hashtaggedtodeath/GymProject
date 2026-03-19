@@ -9,6 +9,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import Profile from './pages/client/Profile';
 import AdminSchedule from './pages/admin/AdminSchedule';
 import AdminReports from './pages/admin/AdminReports';
+import BuyMembership from './pages/client/BuyMembership';
 
 // Защищенный роут (только для авторизованных)
 const PrivateRoute = ({ children }) => {
@@ -30,16 +31,16 @@ function App() {
                 <Routes>
                     <Route path="/login" element={<Login />} />
                     
-                    {/* Клиентские роуты */}
-                    <Route path="/dashboard" element={
-                        <PrivateRoute>
-                            <h1 className="text-2xl font-bold">Личный кабинет</h1>
-                            <p>Тут скоро будет инфо об абонементе</p>
-                        </PrivateRoute>
-                    } />
+                    
+                    
                     <Route path="/schedule" element={
                         <PrivateRoute>
                             <Schedule />
+                        </PrivateRoute>
+                    } />
+                    <Route path="/buy-membership" element={
+                        <PrivateRoute>
+                            <BuyMembership />
                         </PrivateRoute>
                     } />
                     <Route path="/admin/*" element={

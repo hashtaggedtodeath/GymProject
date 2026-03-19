@@ -7,10 +7,20 @@ export default function MainLayout({ children }) {
     const { user, logout } = useAuth();
     const [isMenuOpen, setIsMenuOpen] = useState(false);
 
-    const navItems = user?.role === 'Admin' 
-        ? [{ name: 'Дашборд', path: '/admin' }, { name: 'Расписание', path: '/admin/schedule' }, { name: 'Отчеты', path: '/admin/reports' }]
-        : [{ name: 'Мой профиль', path: '/dashboard' }, { name: 'Записаться', path: '/schedule' }];
+   
 
+    const navItems = user?.role === 'Admin' 
+        ? [
+            { name: 'Дашборд', path: '/admin' }, 
+            { name: 'Расписание', path: '/admin/schedule' }, 
+            { name: 'Тренеры', path: '/admin/trainers' }, 
+            { name: 'Отчеты', path: '/admin/reports' }
+        ]
+        : [
+            { name: 'Мой профиль', path: '/dashboard' }, 
+            { name: 'Записаться', path: '/schedule' },
+            { name: 'Купить абонемент', path: '/buy-membership' } 
+         ];
     return (
         <div className="min-h-screen bg-gray-50">
             <nav className="bg-white shadow-md">
